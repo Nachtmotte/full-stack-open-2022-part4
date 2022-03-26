@@ -24,14 +24,34 @@ describe("get all blogs", () => {
 
   test("all blogs are returned", async () => {
     const response = await api.get("/api/blogs");
-
     expect(response.body).toHaveLength(helper.initialBlogs.length);
   });
 
   test("all blogs have a property called id", async () => {
     const response = await api.get("/api/blogs");
-
     response.body.forEach((blog) => expect(blog.id).toBeDefined());
+  });
+});
+
+describe("get a specific blog", () => {
+  test("succeeds with a valid id", async () => {
+    const blogsAtStart = await helper.blogsInDb();
+
+    const blogToView = blogsAtStart[0];
+
+    const resultBlog = await api
+      .get(`/api/blogs/${blogToView.id}`)
+      .expect(200)
+      .expect("Content-Type", "application/json; charset=utf-8");
+
+    const processedBlogToView = JSON.parse(JSON.stringify(blogToView));
+
+    expect(resultBlog.body).toEqual(processedBlogToView);
+  });
+
+  test("fails with statuscode 404 if blog does not exist", async () => {
+    const validNonexistingId = await helper.nonExistingId();
+    await api.get(`/api/blogs/${validNonexistingId}`).expect(404);
   });
 });
 
@@ -74,6 +94,52 @@ describe("post blog", () => {
     const newBlog = { author: "Edsger W. Dijkstra" };
 
     await api.post("/api/blogs").send(newBlog).expect(400);
+  });
+});
+
+describe("delete blog", () => {
+  test("succeeds with status code 200 if id is valid", async () => {
+    const blogsAtStart = await helper.blogsInDb();
+    const blogToDelete = blogsAtStart[0];
+
+    await api.delete(`/api/blogs/${blogToDelete.id}`).expect(200);
+
+    const blogsAtEnd = await helper.blogsInDb();
+
+    expect(blogsAtEnd).toHaveLength(helper.initialBlogs.length - 1);
+
+    const titles = blogsAtEnd.map((r) => r.title);
+
+    expect(titles).not.toContain(blogToDelete.title);
+  });
+
+  test("fails with statuscode 404 if blog does not exist", async () => {
+    const validNonexistingId = await helper.nonExistingId();
+    await api.delete(`/api/blogs/${validNonexistingId}`).expect(404);
+  });
+});
+
+describe("update blog", () => {
+  test("succeeds with status code 200 if id is valid", async () => {
+    const blogsAtStart = await helper.blogsInDb();
+    const blogToUpdate = blogsAtStart[0];
+
+    await api
+      .put(`/api/blogs/${blogToUpdate.id}`)
+      .send({ likes: 10 })
+      .expect(200);
+
+    const response = await api.get(`/api/blogs/${blogToUpdate.id}`);
+
+    expect(response.body.likes).toBe(10);
+  });
+
+  test("fails with statuscode 404 if blog does not exist", async () => {
+    const validNonexistingId = await helper.nonExistingId();
+    await api
+      .put(`/api/blogs/${validNonexistingId}`)
+      .send({ likes: 10 })
+      .expect(404);
   });
 });
 
